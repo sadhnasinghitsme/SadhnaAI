@@ -1,0 +1,6 @@
+pandas
+scikit-learn
+openpyxl
+matplotlib
+joblib
+pymongo

@@ -1,0 +1,47 @@
+# Ignore everything first
+*
+
+# ---- KEEP these ----
+
+# src/ folder (main code + db/)
+!src/
+!src/**
+
+# Entry files
+!run.py
+!predict.py
+!train.py
+
+# Dependencies & docs
+!requirements.txt
+!README.md
+
+# Training data CSV only
+!data/
+!data/training_data.csv
+
+# Model training script
+!model/
+!model/train_tf_model.py
+
+# Keep this gitignore
+!.gitignore
+
+# ---- Always ignore these even inside kept folders ----
+__pycache__/
+*.pyc
+*.pkl
+*.keras
+.DS_Store
+.vscode/
+venv/
+
+# Ignore BOQ Excel files (large)
+*.xlsx
+*.xls
+
+# Ignore output files
+*.png
+*.json
+*.log
+outputs/
