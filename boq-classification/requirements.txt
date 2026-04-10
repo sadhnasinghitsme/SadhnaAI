@@ -4,3 +4,4 @@ openpyxl
 matplotlib
 joblib
 pymongo
+google-cloud-storage
