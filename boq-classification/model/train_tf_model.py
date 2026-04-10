@@ -10,8 +10,7 @@ os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"  # suppress TF info logs
 
 import tensorflow as tf
 from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import Dense, Dropout
-from sklearn.feature_extraction.text import TfidfVectorizer
+from tensorflow.keras.layers import Dense, Dropout, Embedding, GlobalAveragePooling1D
 from sklearn.preprocessing import LabelEncoder
 from sklearn.model_selection import train_test_split
 
@@ -52,23 +51,24 @@ labels = df["category"].tolist()
 # 3. VECTORIZE + ENCODE
 # ──────────────────────────────────────────────
 
-tfidf = TfidfVectorizer(ngram_range=(1, 3), max_features=5000, sublinear_tf=True)
-X = tfidf.fit_transform(texts).toarray()
-
 le = LabelEncoder()
 y_encoded = le.fit_transform(labels)
 num_classes = len(le.classes_)
 
-# One-hot encode labels for Keras
-y = tf.keras.utils.to_categorical(y_encoded, num_classes=num_classes)
-
 # Train/test split
-X_train, X_test, y_train, y_test = train_test_split(
-    X, y, test_size=0.2, random_state=42, stratify=y_encoded
+X_train_text, X_test_text, y_train, y_test = train_test_split(
+    texts, y_encoded, test_size=0.2, random_state=42, stratify=y_encoded
 )
 
+# TextVectorization (fit on ALL texts)
+from tensorflow.keras.layers import TextVectorization
+vectorizer = TextVectorization(max_tokens=4000, output_sequence_length=30)
+vectorizer.adapt(texts)
+
+X_train = vectorizer(X_train_text)
+X_test = vectorizer(X_test_text)
+
 print(f"\n🔹 Train: {len(X_train)} | Test: {len(X_test)}")
-print(f"🔹 Features (TF-IDF): {X.shape[1]}")
 print(f"🔹 Classes: {list(le.classes_)}")
 
 
@@ -77,16 +77,17 @@ print(f"🔹 Classes: {list(le.classes_)}")
 # ──────────────────────────────────────────────
 
 model = Sequential([
-    Dense(128, activation="relu", input_shape=(X.shape[1],)),
+    Embedding(input_dim=4000, output_dim=64),
+    GlobalAveragePooling1D(),
+    Dense(128, activation="relu"),
     Dropout(0.3),
     Dense(64, activation="relu"),
-    Dropout(0.2),
     Dense(num_classes, activation="softmax"),
 ])
 
 model.compile(
     optimizer="adam",
-    loss="categorical_crossentropy",
+    loss="sparse_categorical_crossentropy",
     metrics=["accuracy"],
 )
 
@@ -101,7 +102,7 @@ print(f"{'=' * 50}\n")
 
 history = model.fit(
     X_train, y_train,
-    epochs=10,
+    epochs=20,
     batch_size=16,
     validation_data=(X_test, y_test),
     verbose=1,
@@ -115,10 +116,8 @@ history = model.fit(
 final_acc = history.history["accuracy"][-1]
 val_acc = history.history["val_accuracy"][-1]
 
-print(f"\n{'=' * 50}")
-print(f"✅ Final Training Accuracy:   {round(final_acc * 100, 2)}%")
-print(f"✅ Final Validation Accuracy: {round(val_acc * 100, 2)}%")
-print(f"{'=' * 50}")
+print(f"\nTrain Accuracy: {final_acc}")
+print(f"Validation Accuracy: {val_acc}")
 
 
 # ──────────────────────────────────────────────
@@ -127,11 +126,12 @@ print(f"{'=' * 50}")
 
 os.makedirs("models", exist_ok=True)
 model.save("models/boq_tf_model.keras")
-joblib.dump(tfidf, "models/tfidf_vectorizer.pkl")
+vectorizer_model = tf.keras.Sequential([vectorizer])
+vectorizer_model.save("models/vectorizer_model.keras")
 joblib.dump(le, "models/label_encoder.pkl")
 
 print(f"\n💾 Model saved  -> models/boq_tf_model.keras")
-print(f"💾 TF-IDF saved -> models/tfidf_vectorizer.pkl")
+print(f"💾 Vectorizer saved -> models/vectorizer_model.keras")
 print(f"💾 Encoder saved -> models/label_encoder.pkl")
 
 
@@ -154,7 +154,7 @@ print(f"{'=' * 60}")
 
 for text in test_texts:
     cleaned = clean_text(text)
-    vec = tfidf.transform([cleaned]).toarray()
+    vec = vectorizer(tf.constant([cleaned]))
     proba = model.predict(vec, verbose=0)[0]
     idx = np.argmax(proba)
     cat = le.classes_[idx]

@@ -25,27 +25,28 @@ class BOQModel:
         texts = df["description"].astype(str).values
         categories = df["category"].values
 
+        # Clean text
+        texts = np.array([t.lower().strip() for t in texts])
+
         # Label encoding
         self.labels = sorted(set(categories))
         label_map = {label: i for i, label in enumerate(self.labels)}
         ys = np.array([label_map[c] for c in categories])
 
-        # Shuffle data (no fixed seed for better randomness)
-        from sklearn.utils import shuffle
+        # Shuffle data
         texts, ys = shuffle(texts, ys)
 
-        # Split data 70/30 for better test evaluation
+        # Split data 80/20
         X_train, X_test, y_train, y_test = train_test_split(
             texts, ys, test_size=0.2, random_state=42
         )
 
         # Vectorizer (fit on ALL texts so test vocab is covered)
         self.vectorizer = TextVectorization(
-            max_tokens=3000,
-            output_sequence_length=25
-)
+            max_tokens=4000,
+            output_sequence_length=30
+        )
         self.vectorizer.adapt(texts)
-
 
         # Vectorize train and test
         xs_train = self.vectorizer(X_train)
@@ -53,15 +54,16 @@ class BOQModel:
 
         # Model
         self.model = Sequential([
-            Embedding(input_dim=3000, output_dim=64),
+            Embedding(input_dim=4000, output_dim=64),
             GlobalAveragePooling1D(),
+            Dense(128, activation="relu"),
+            Dropout(0.3),
             Dense(64, activation="relu"),
-            Dense(32, activation="relu"),
             Dense(len(self.labels), activation="softmax")
         ])
 
         # Build model before training
-        self.model.build(input_shape=(None, 25))
+        self.model.build(input_shape=(None, 30))
 
         self.model.compile(
             optimizer="adam",
@@ -69,13 +71,17 @@ class BOQModel:
             metrics=["accuracy"]
         )
 
-        # Train (25 epochs)
-        history = self.model.fit(xs_train, y_train, epochs=25, verbose=1)
+        # Train with validation
+        history = self.model.fit(
+            xs_train, y_train,
+            epochs=20,
+            validation_data=(xs_test, y_test),
+            verbose=1
+        )
 
-        # Evaluate on test data
-        loss, acc = self.model.evaluate(xs_test, y_test, verbose=0)
-        print(f"\n✅ Training Accuracy: {round(history.history['accuracy'][-1], 2)}")
-        print(f"✅ Real Accuracy (Test): {round(acc, 2)}")
+        # Print both accuracies
+        print(f"\nTrain Accuracy: {history.history['accuracy'][-1]}")
+        print(f"Validation Accuracy: {history.history['val_accuracy'][-1]}")
         return history
 
     def predict(self, text):

@@ -13,3 +13,9 @@ OUT_PLOT_DIR   = os.path.join(BASE_DIR, "outputs", "plots")
 OUT_LOG_DIR    = os.path.join(BASE_DIR, "outputs", "logs")
 
 CATEGORIES = ["Plumbing", "Electrical", "Fire", "Civil", "PHE", "Other"]
+
+# Google Cloud Storage config
+# Set these via environment variables or update directly
+GCS_BUCKET_NAME    = os.environ.get("GCS_BUCKET_NAME", "your-boq-bucket")
+GCS_DATA_PREFIX    = os.environ.get("GCS_DATA_PREFIX", "boq-data/")  # folder path in bucket
+GCS_CREDENTIALS    = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS", "")
